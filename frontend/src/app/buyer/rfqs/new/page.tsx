@@ -16,7 +16,9 @@ export default function NewRFQPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     setError("");
@@ -28,36 +30,92 @@ export default function NewRFQPage() {
       return;
     }
 
-    if (Number(quantity) <= 0) {
-      setError("Quantity must be greater than 0");
+    const trimmedProductName = productName.trim();
+    const trimmedDescription = description.trim();
+    const trimmedDeliveryLocation = deliveryLocation.trim();
+    const numericQuantity = Number(quantity);
+
+    if (trimmedProductName.length < 2) {
+      setError(
+        "Product or service name must be at least 2 characters.",
+      );
+      return;
+    }
+
+    if (trimmedProductName.length > 200) {
+      setError(
+        "Product or service name cannot exceed 200 characters.",
+      );
+      return;
+    }
+
+    if (trimmedDescription.length < 10) {
+      setError("Description must be at least 10 characters.");
+      return;
+    }
+
+    if (trimmedDescription.length > 5000) {
+      setError("Description cannot exceed 5000 characters.");
+      return;
+    }
+
+    if (
+      !quantity ||
+      !Number.isInteger(numericQuantity) ||
+      numericQuantity <= 0
+    ) {
+      setError("Quantity must be a whole number greater than 0.");
+      return;
+    }
+
+    if (trimmedDeliveryLocation.length < 2) {
+      setError("Delivery location is required.");
+      return;
+    }
+
+    if (trimmedDeliveryLocation.length > 300) {
+      setError(
+        "Delivery location cannot exceed 300 characters.",
+      );
       return;
     }
 
     if (!deadline) {
-      setError("Please select a deadline");
+      setError("Please select a deadline.");
       return;
     }
 
     const selectedDeadline = new Date(deadline);
 
+    if (Number.isNaN(selectedDeadline.getTime())) {
+      setError("Please select a valid deadline.");
+      return;
+    }
+
     if (selectedDeadline <= new Date()) {
-      setError("Deadline must be in the future");
+      setError("Deadline must be in the future.");
       return;
     }
 
     setLoading(true);
 
     try {
-      await createRFQ(
+      const response = await createRFQ(
         {
-          productName,
-          description,
-          quantity: Number(quantity),
-          deliveryLocation,
+          productName: trimmedProductName,
+          description: trimmedDescription,
+          quantity: numericQuantity,
+          deliveryLocation: trimmedDeliveryLocation,
           deadline: selectedDeadline.toISOString(),
         },
         token,
       );
+
+      if (!response.success || !response.data) {
+        throw new Error(
+          response.message ?? "Failed to create RFQ",
+        );
+      }
 
       router.push("/buyer");
     } catch (error) {
@@ -77,7 +135,8 @@ export default function NewRFQPage() {
         <button
           type="button"
           onClick={() => router.push("/buyer")}
-          className="mb-6 text-sm font-medium text-gray-600 hover:text-black"
+          disabled={loading}
+          className="mb-6 text-sm font-medium text-gray-600 hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
         >
           ← Back to Dashboard
         </button>
@@ -94,7 +153,10 @@ export default function NewRFQPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-6"
+          >
             <div>
               <label
                 htmlFor="productName"
@@ -114,7 +176,8 @@ export default function NewRFQPage() {
                 required
                 minLength={2}
                 maxLength={200}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none placeholder:text-gray-400 focus:border-black"
+                disabled={loading}
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none placeholder:text-gray-400 focus:border-black disabled:bg-gray-100"
               />
             </div>
 
@@ -137,7 +200,8 @@ export default function NewRFQPage() {
                 minLength={10}
                 maxLength={5000}
                 rows={6}
-                className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none placeholder:text-gray-400 focus:border-black"
+                disabled={loading}
+                className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none placeholder:text-gray-400 focus:border-black disabled:bg-gray-100"
               />
             </div>
 
@@ -161,7 +225,8 @@ export default function NewRFQPage() {
                   required
                   min="1"
                   step="1"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none placeholder:text-gray-400 focus:border-black"
+                  disabled={loading}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none placeholder:text-gray-400 focus:border-black disabled:bg-gray-100"
                 />
               </div>
 
@@ -181,7 +246,8 @@ export default function NewRFQPage() {
                     setDeadline(event.target.value)
                   }
                   required
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-black"
+                  disabled={loading}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-black disabled:bg-gray-100"
                 />
               </div>
             </div>
@@ -205,12 +271,16 @@ export default function NewRFQPage() {
                 required
                 minLength={2}
                 maxLength={300}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none placeholder:text-gray-400 focus:border-black"
+                disabled={loading}
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none placeholder:text-gray-400 focus:border-black disabled:bg-gray-100"
               />
             </div>
 
             {error && (
-              <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600">
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+              >
                 {error}
               </div>
             )}
@@ -219,7 +289,8 @@ export default function NewRFQPage() {
               <button
                 type="button"
                 onClick={() => router.push("/buyer")}
-                className="rounded-lg border border-gray-300 px-6 py-3 font-medium text-gray-700 hover:bg-gray-100"
+                disabled={loading}
+                className="rounded-lg border border-gray-300 px-6 py-3 font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>

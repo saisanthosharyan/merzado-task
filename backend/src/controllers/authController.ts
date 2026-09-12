@@ -69,7 +69,20 @@ export const signup = async (
         },
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: number }).code === 11000
+    ) {
+      res.status(409).json({
+        success: false,
+        message: "Email is already registered",
+      });
+      return;
+    }
+
     console.error("Signup error:", error);
 
     res.status(500).json({
@@ -144,6 +157,7 @@ export const login = async (
     });
   }
 };
+
 export const getMe = async (
   req: AuthRequest,
   res: Response,

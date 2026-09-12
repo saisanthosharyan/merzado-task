@@ -1,4 +1,5 @@
 import { Response } from "express";
+import mongoose from "mongoose";
 import Quotation from "../models/Quotation.js";
 import RFQ from "../models/RFQ.js";
 import { AuthRequest } from "../middleware/authMiddleware.js";
@@ -34,6 +35,14 @@ export const createQuotation = async (
       estimatedDeliveryTime,
       message,
     } = result.data;
+
+    if (!mongoose.isValidObjectId(rfqId)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid RFQ ID",
+      });
+      return;
+    }
 
     const rfq = await RFQ.findById(rfqId);
 
@@ -72,24 +81,43 @@ export const createQuotation = async (
     if (existingQuotation) {
       res.status(409).json({
         success: false,
-        message: "You have already submitted a quotation for this RFQ",
+        message:
+          "You have already submitted a quotation for this RFQ",
       });
       return;
     }
 
-    const quotation = await Quotation.create({
-      rfqId,
-      supplierId: req.userId,
-      quotedPrice,
-      estimatedDeliveryTime,
-      message,
-    });
+    try {
+      const quotation = await Quotation.create({
+        rfqId,
+        supplierId: req.userId,
+        quotedPrice,
+        estimatedDeliveryTime,
+        message,
+      });
 
-    res.status(201).json({
-      success: true,
-      message: "Quotation submitted successfully",
-      data: quotation,
-    });
+      res.status(201).json({
+        success: true,
+        message: "Quotation submitted successfully",
+        data: quotation,
+      });
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code?: number }).code === 11000
+      ) {
+        res.status(409).json({
+          success: false,
+          message:
+            "You have already submitted a quotation for this RFQ",
+        });
+        return;
+      }
+
+      throw error;
+    }
   } catch (error) {
     console.error("Create quotation error:", error);
 
@@ -99,6 +127,7 @@ export const createQuotation = async (
     });
   }
 };
+
 export const getMyQuotations = async (
   req: AuthRequest,
   res: Response,

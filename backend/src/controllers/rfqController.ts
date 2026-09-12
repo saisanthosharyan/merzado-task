@@ -1,8 +1,13 @@
 import { Response } from "express";
+import mongoose from "mongoose";
 import RFQ from "../models/RFQ.js";
 import { AuthRequest } from "../middleware/authMiddleware.js";
 import { createRFQSchema } from "../utils/validation.js";
 import Quotation from "../models/Quotation.js";
+
+const escapeRegex = (value: string): string => {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
 
 export const createRFQ = async (
   req: AuthRequest,
@@ -28,8 +33,13 @@ export const createRFQ = async (
       return;
     }
 
-    const { productName, description, quantity, deliveryLocation, deadline } =
-      result.data;
+    const {
+      productName,
+      description,
+      quantity,
+      deliveryLocation,
+      deadline,
+    } = result.data;
 
     const deadlineDate = new Date(deadline);
 
@@ -76,15 +86,29 @@ export const getRFQs = async (
     const filter: Record<string, unknown> = {};
 
     if (search && typeof search === "string") {
+      const safeSearch = escapeRegex(search);
+
       filter.$or = [
-        { productName: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
+        {
+          productName: {
+            $regex: safeSearch,
+            $options: "i",
+          },
+        },
+        {
+          description: {
+            $regex: safeSearch,
+            $options: "i",
+          },
+        },
       ];
     }
 
     if (location && typeof location === "string") {
+      const safeLocation = escapeRegex(location);
+
       filter.deliveryLocation = {
-        $regex: location,
+        $regex: safeLocation,
         $options: "i",
       };
     }
@@ -92,7 +116,9 @@ export const getRFQs = async (
     if (
       status &&
       typeof status === "string" &&
-      ["OPEN", "CLOSED", "EXPIRED"].includes(status.toUpperCase())
+      ["OPEN", "CLOSED", "EXPIRED"].includes(
+        status.toUpperCase(),
+      )
     ) {
       filter.status = status.toUpperCase();
     }
@@ -104,7 +130,10 @@ export const getRFQs = async (
     const now = new Date();
 
     for (const rfq of rfqs) {
-      if (rfq.status === "OPEN" && rfq.deadline <= now) {
+      if (
+        rfq.status === "OPEN" &&
+        rfq.deadline <= now
+      ) {
         rfq.status = "EXPIRED";
         await rfq.save();
       }
@@ -141,6 +170,18 @@ export const getMyRFQs = async (
       buyerId: req.userId,
     }).sort({ createdAt: -1 });
 
+    const now = new Date();
+
+    for (const rfq of rfqs) {
+      if (
+        rfq.status === "OPEN" &&
+        rfq.deadline <= now
+      ) {
+        rfq.status = "EXPIRED";
+        await rfq.save();
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: rfqs,
@@ -160,10 +201,17 @@ export const getRFQById = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const rfq = await RFQ.findById(req.params.id).populate(
-      "buyerId",
-      "name email",
-    );
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid RFQ ID",
+      });
+      return;
+    }
+
+    const rfq = await RFQ.findById(
+      req.params.id,
+    ).populate("buyerId", "name email");
 
     if (!rfq) {
       res.status(404).json({
@@ -173,7 +221,10 @@ export const getRFQById = async (
       return;
     }
 
-    if (rfq.status === "OPEN" && rfq.deadline <= new Date()) {
+    if (
+      rfq.status === "OPEN" &&
+      rfq.deadline <= new Date()
+    ) {
       rfq.status = "EXPIRED";
       await rfq.save();
     }
@@ -187,7 +238,7 @@ export const getRFQById = async (
 
     res.status(500).json({
       success: false,
-      message: "Invalid RFQ ID",
+      message: "Internal server error",
     });
   }
 };
@@ -197,6 +248,14 @@ export const updateRFQ = async (
   res: Response,
 ): Promise<void> => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid RFQ ID",
+      });
+      return;
+    }
+
     if (!req.userId) {
       res.status(401).json({
         success: false,
@@ -242,7 +301,9 @@ export const updateRFQ = async (
       return;
     }
 
-    const deadlineDate = new Date(result.data.deadline);
+    const deadlineDate = new Date(
+      result.data.deadline,
+    );
 
     if (deadlineDate <= new Date()) {
       res.status(400).json({
@@ -255,7 +316,8 @@ export const updateRFQ = async (
     rfq.productName = result.data.productName;
     rfq.description = result.data.description;
     rfq.quantity = result.data.quantity;
-    rfq.deliveryLocation = result.data.deliveryLocation;
+    rfq.deliveryLocation =
+      result.data.deliveryLocation;
     rfq.deadline = deadlineDate;
 
     await rfq.save();
@@ -270,7 +332,7 @@ export const updateRFQ = async (
 
     res.status(500).json({
       success: false,
-      message: "Invalid RFQ ID",
+      message: "Internal server error",
     });
   }
 };
@@ -280,6 +342,14 @@ export const deleteRFQ = async (
   res: Response,
 ): Promise<void> => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid RFQ ID",
+      });
+      return;
+    }
+
     if (!req.userId) {
       res.status(401).json({
         success: false,
@@ -317,15 +387,24 @@ export const deleteRFQ = async (
 
     res.status(500).json({
       success: false,
-      message: "Invalid RFQ ID",
+      message: "Internal server error",
     });
   }
 };
+
 export const getRFQQuotations = async (
   req: AuthRequest,
   res: Response,
 ): Promise<void> => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid RFQ ID",
+      });
+      return;
+    }
+
     if (!req.userId) {
       res.status(401).json({
         success: false,
@@ -347,7 +426,8 @@ export const getRFQQuotations = async (
     if (rfq.buyerId.toString() !== req.userId) {
       res.status(403).json({
         success: false,
-        message: "You can only view quotations for your own RFQs",
+        message:
+          "You can only view quotations for your own RFQs",
       });
       return;
     }
@@ -367,7 +447,7 @@ export const getRFQQuotations = async (
 
     res.status(500).json({
       success: false,
-      message: "Invalid RFQ ID",
+      message: "Internal server error",
     });
   }
 };

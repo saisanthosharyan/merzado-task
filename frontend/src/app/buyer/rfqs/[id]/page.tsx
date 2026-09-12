@@ -117,14 +117,16 @@ export default function RFQDetailsPage() {
               </p>
             </div>
 
-            <button
-              onClick={() =>
-                router.push(`/buyer/rfqs/${rfq._id}/edit`)
-              }
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
-            >
-              Edit RFQ
-            </button>
+            {rfq.status === "OPEN" && (
+              <button
+                onClick={() =>
+                  router.push(`/buyer/rfqs/${rfq._id}/edit`)
+                }
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+              >
+                Edit RFQ
+              </button>
+            )}
           </div>
 
           <div className="mt-8">

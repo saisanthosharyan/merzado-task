@@ -12,23 +12,44 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     setError("");
+
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      setError("Email is required.");
+      return;
+    }
+
+    if (!password) {
+      setError("Password is required.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const response = await login({
-        email,
+        email: trimmedEmail,
         password,
       });
 
-      if (!response.data) {
-        throw new Error("Login response is invalid");
+      if (!response.success || !response.data) {
+        throw new Error(
+          response.message ?? "Login failed",
+        );
       }
 
-      localStorage.setItem("rfq_token", response.data.token);
+      localStorage.setItem(
+        "rfq_token",
+        response.data.token,
+      );
+
       localStorage.setItem(
         "rfq_user",
         JSON.stringify(response.data.user),
@@ -63,7 +84,10 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-5"
+        >
           <div>
             <label
               htmlFor="email"
@@ -76,10 +100,14 @@ export default function LoginPage() {
               id="email"
               type="email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) =>
+                setEmail(event.target.value)
+              }
               placeholder="you@example.com"
               required
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
+              autoComplete="email"
+              disabled={loading}
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black disabled:bg-gray-100"
             />
           </div>
 
@@ -100,12 +128,17 @@ export default function LoginPage() {
               }
               placeholder="Enter your password"
               required
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
+              autoComplete="current-password"
+              disabled={loading}
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black disabled:bg-gray-100"
             />
           </div>
 
           {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+            >
               {error}
             </div>
           )}
@@ -121,12 +154,14 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-sm text-gray-600">
           Don&apos;t have an account?{" "}
-          <a
-            href="/signup"
-            className="font-semibold text-black hover:underline"
+          <button
+            type="button"
+            onClick={() => router.push("/signup")}
+            disabled={loading}
+            className="font-semibold text-black hover:underline disabled:cursor-not-allowed disabled:opacity-50"
           >
             Create account
-          </a>
+          </button>
         </p>
       </div>
     </main>

@@ -25,7 +25,7 @@ const quotationSchema = new Schema<IQuotation>(
     quotedPrice: {
       type: Number,
       required: true,
-      min: 0,
+      min: 0.01,
     },
     estimatedDeliveryTime: {
       type: String,

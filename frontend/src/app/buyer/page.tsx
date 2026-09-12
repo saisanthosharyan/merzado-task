@@ -40,6 +40,10 @@ export default function BuyerPage() {
         setRfqs(rfqResponse.data ?? []);
       })
       .catch((error) => {
+        localStorage.removeItem("rfq_token");
+        localStorage.removeItem("rfq_user");
+        router.replace("/login");
+
         setError(
           error instanceof Error
             ? error.message

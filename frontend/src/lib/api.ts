@@ -12,23 +12,36 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<ApiResponse<T>> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers ?? {}),
-    },
-  });
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers ?? {}),
+      },
+    });
 
-  const data = await response.json();
+    let data: ApiResponse<T>;
 
-  if (!response.ok) {
-    throw new Error(data.message ?? "Something went wrong");
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error("The server returned an invalid response.");
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message ?? "Something went wrong");
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error("Unable to connect to the server.");
   }
-
-  return data;
 }
-
 export type UserRole = "BUYER" | "SUPPLIER";
 
 export type User = {
@@ -130,6 +143,127 @@ export async function getRFQById(
   token: string,
 ): Promise<ApiResponse<RFQ>> {
   return request<RFQ>(`/api/rfqs/${id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+export async function getRFQs(
+  token: string,
+  params?: {
+    search?: string;
+    location?: string;
+    status?: string;
+  },
+): Promise<ApiResponse<RFQ[]>> {
+  const searchParams = new URLSearchParams();
+
+  if (params?.search) {
+    searchParams.set("search", params.search);
+  }
+
+  if (params?.location) {
+    searchParams.set("location", params.location);
+  }
+
+  if (params?.status) {
+    searchParams.set("status", params.status);
+  }
+
+  const query = searchParams.toString();
+
+  return request<RFQ[]>(`/api/rfqs${query ? `?${query}` : ""}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+export type Quotation = {
+  _id: string;
+  rfqId:
+    | string
+    | {
+        _id: string;
+        productName: string;
+        description: string;
+        quantity: number;
+        deliveryLocation: string;
+        deadline: string;
+        status: "OPEN" | "CLOSED" | "EXPIRED";
+      };
+  supplierId:
+    | string
+    | {
+        _id: string;
+        name: string;
+        email: string;
+      };
+  quotedPrice: number;
+  estimatedDeliveryTime: string;
+  message?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateQuotationData = {
+  rfqId: string;
+  quotedPrice: number;
+  estimatedDeliveryTime: string;
+  message?: string;
+};
+export async function updateRFQ(
+  id: string,
+  data: CreateRFQData,
+  token: string,
+): Promise<ApiResponse<RFQ>> {
+  return request<RFQ>(`/api/rfqs/${id}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteRFQ(
+  id: string,
+  token: string,
+): Promise<ApiResponse<undefined>> {
+  return request<undefined>(`/api/rfqs/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+export async function createQuotation(
+  data: CreateQuotationData,
+  token: string,
+): Promise<ApiResponse<Quotation>> {
+  return request<Quotation>("/api/quotations", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getMyQuotations(
+  token: string,
+): Promise<ApiResponse<Quotation[]>> {
+  return request<Quotation[]>("/api/quotations/my", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function getRFQQuotations(
+  rfqId: string,
+  token: string,
+): Promise<ApiResponse<Quotation[]>> {
+  return request<Quotation[]>(`/api/rfqs/${rfqId}/quotations`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
